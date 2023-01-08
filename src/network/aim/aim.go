@@ -12,7 +12,10 @@ const (
 )
 
 func IncomingSNACData(client network.Client, context AIMContext, message *SNACMessage) {
-	
+	switch message.Foodgroup {
+	case FoodgroupBUCP:
+		BUCPIncomingSNACData(client, context, message)
+	}
 }
 
 func LogonAIM() {
@@ -61,7 +64,7 @@ func LogonAIM() {
 
 				for _, packet := range packets {
 					switch packet.Frame {
-					case FrameData: 
+					case FrameData:
 						continue
 					}
 				}
