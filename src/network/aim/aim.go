@@ -73,6 +73,9 @@ func LogonAIM() {
 						if snac.Foodgroup == FoodgroupBUCP {
 							BUCPIncomingSNACData(&client, context, snac)
 						}
+					} else if packet.Frame == FrameSignOff {
+						client.Connection.CloseConnection()
+						break
 					}
 				}
 			}
