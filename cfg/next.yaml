@@ -8,5 +8,6 @@ encryption:
 services:
   myspace: true
   msn: false
-  yahoo: false
+  yahoo: false 
+  aim: true
   api: false
