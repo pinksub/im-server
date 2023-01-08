@@ -35,7 +35,7 @@ func LogonAIM() {
 			// might move later
 			sequence := uint16(rand.Intn(0xFFFF))
 
-			versionFlap := FLAPPacket{
+			versionFlap := &FLAPPacket{
 				Frame:    FrameSignOn,
 				Sequence: sequence,
 				Data:     flapVersion,
@@ -64,7 +64,7 @@ func LogonAIM() {
 
 					case FrameData:
 						// this is snac data
-						
+
 					}
 				}
 			}

@@ -19,28 +19,28 @@ type FLAPPacket struct {
 	Data       []byte
 }
 
-func FLAPSerialize(flap []byte) ([]FLAPPacket, error) {
-	packets := []FLAPPacket{}
+func FLAPSerialize(flap []byte) ([]*FLAPPacket, error) {
+	packets := make([]*FLAPPacket, 0)
 
 	i := 0
 
 	for i < len(flap) { 
 		if len(flap)-i < 6 {
-			return packets, errors.New("incorrect length")
+			return nil, errors.New("incorrect length")
 		} else if flap[i] != 0x2A {
-			return packets, errors.New("invalid marker")
+			return nil, errors.New("invalid marker")
 		}
 
-		packet := FLAPPacket{
+		packet := &FLAPPacket{
 			Frame:      flap[i+1],
 			Sequence:   binary.BigEndian.Uint16(flap[i+2 : i+4]),
 			DataLength: binary.BigEndian.Uint16(flap[i+4 : i+6]),
 		}
 
 		if int(packet.DataLength) > len(flap)-i {
-			return packets, errors.New("incorrect length")
+			return nil, errors.New("incorrect length")
 		} else if packet.Frame != FrameSignOn && packet.Frame != FrameData && packet.Frame != FrameError && packet.Frame != FrameSignOff {
-			return packets, errors.New("incorrect frame")
+			return nil, errors.New("incorrect frame")
 		}
 
 		packet.Data = make([]byte, packet.DataLength)
@@ -53,7 +53,7 @@ func FLAPSerialize(flap []byte) ([]FLAPPacket, error) {
 	return packets, nil
 }
 
-func FLAPDeserialize(packet FLAPPacket) []byte {
+func FLAPDeserialize(packet *FLAPPacket) []byte {
 	flap := make([]byte, 6+len(packet.Data))
 
 	flap[0] = 0x2A

@@ -12,8 +12,8 @@ type SNACMessage struct {
 	Data      []byte
 }
 
-func SNACSerialize(snac []byte) SNACMessage {
-	message := SNACMessage{
+func SNACSerialize(snac []byte) *SNACMessage {
+	message := &SNACMessage{
 		Foodgroup: binary.BigEndian.Uint16(snac[0:2]),
 		Subgroup:  binary.BigEndian.Uint16(snac[2:4]),
 		Flags:     binary.BigEndian.Uint16(snac[4:6]),
@@ -25,7 +25,7 @@ func SNACSerialize(snac []byte) SNACMessage {
 	return message
 }
 
-func SNACDeserialize(message SNACMessage) []byte {
+func SNACDeserialize(message *SNACMessage) []byte {
 	snac := make([]byte, len(message.Data)+10)
 
 	binary.BigEndian.PutUint16(snac[0:2], message.Foodgroup)
