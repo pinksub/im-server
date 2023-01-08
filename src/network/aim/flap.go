@@ -19,12 +19,21 @@ type FLAPPacket struct {
 	Data       []byte
 }
 
+func NewFLAP(frame byte, sequence uint16, data []byte) *FLAPPacket {
+	return &FLAPPacket{
+		Frame: frame,
+		Sequence: sequence,
+		DataLength: uint16(len(data)),
+		Data: data,
+	}
+}
+
 func FLAPSerialize(flap []byte) ([]*FLAPPacket, error) {
 	packets := make([]*FLAPPacket, 0)
 
 	i := 0
 
-	for i < len(flap) { 
+	for i < len(flap) {
 		if len(flap)-i < 6 {
 			return nil, errors.New("incorrect length")
 		} else if flap[i] != 0x2A {

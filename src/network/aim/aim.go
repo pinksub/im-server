@@ -11,6 +11,18 @@ const (
 	FoodgroupBUCP = 0x0017
 )
 
+func IncrementSequence(context *AIMContext) {
+	if context.ServerSequence != 65535 {
+		context.ServerSequence++
+	} else {
+		context.ServerSequence = 0
+	}
+}
+
+func ResetSequence(context *AIMContext) {
+	context.ServerSequence = uint16(rand.Intn(0xFFFF))
+}
+
 func LogonAIM() {
 
 	// The BUCP server listens on 5190 and handles authentication, then the client is transported to the BOS server which listens on 5191
@@ -32,9 +44,8 @@ func LogonAIM() {
 				Connection: tcpServer,
 			}
 
-			context := AIMContext{
-				ServerSequence: uint16(rand.Intn(0xFFFF)),
-			}
+			context := &AIMContext{}
+			ResetSequence(context)
 
 			versionFlap := &FLAPPacket{
 				Frame:    FrameSignOn,
@@ -60,7 +71,7 @@ func LogonAIM() {
 						snac := SNACSerialize(packet.Data)
 
 						if snac.Foodgroup == FoodgroupBUCP {
-							BUCPIncomingSNACData(client, context, snac)
+							BUCPIncomingSNACData(&client, context, snac)
 						}
 					}
 				}

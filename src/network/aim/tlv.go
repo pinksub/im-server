@@ -12,6 +12,14 @@ type TLV struct {
 	Value  []byte
 }
 
+func NewTLV(tlvType uint16, tlvValue []byte) *TLV {
+	return &TLV{
+		Type: tlvType,
+		Length: uint16(len(tlvValue)),
+		Value: tlvValue,
+	}
+}
+
 func TLVSerialize(data []byte) (*TLV, error) {
 	if len(data) < 4 {
 		return nil, errors.New("incorrect length")
