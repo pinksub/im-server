@@ -13,39 +13,40 @@ const (
 )
 
 type FLAPPacket struct {
-	Frame    byte
-	Sequence uint16
-	Data     []byte
+	Frame      byte
+	Sequence   uint16
+	DataLength uint16
+	Data       []byte
 }
 
-func FLAPSerialize(flap []byte) (outPackets []FLAPPacket, err error) {
+func FLAPSerialize(flap []byte) ([]FLAPPacket, error) {
 	packets := []FLAPPacket{}
 
 	i := 0
 
-	for i < len(flap) {
-		if flap[0] != 0x2A {
-			return packets, errors.New("invalid marker")
-		} else if len(flap)-i < 6 {
+	for i < len(flap) { 
+		if len(flap)-i < 6 {
 			return packets, errors.New("incorrect length")
+		} else if flap[i] != 0x2A {
+			return packets, errors.New("invalid marker")
 		}
 
-		length := binary.BigEndian.Uint16(flap[i+4 : i+6])
 		packet := FLAPPacket{
-			Frame:    flap[i+1],
-			Sequence: binary.BigEndian.Uint16(flap[i+2 : i+4]),
+			Frame:      flap[i+1],
+			Sequence:   binary.BigEndian.Uint16(flap[i+2 : i+4]),
+			DataLength: binary.BigEndian.Uint16(flap[i+4 : i+6]),
 		}
 
-		if int(length) > len(flap)-i {
+		if int(packet.DataLength) > len(flap)-i {
 			return packets, errors.New("incorrect length")
 		} else if packet.Frame != FrameSignOn && packet.Frame != FrameData && packet.Frame != FrameError && packet.Frame != FrameSignOff {
 			return packets, errors.New("incorrect frame")
 		}
 
-		packet.Data = make([]byte, length)
-		copy(packet.Data, flap[i+6:i+6+int(length)])
+		packet.Data = make([]byte, packet.DataLength)
+		copy(packet.Data, flap[i+6:i+6+int(packet.DataLength)])
 
-		i += 6 + int(length)
+		i += 6 + int(packet.DataLength)
 		packets = append(packets, packet)
 	}
 
