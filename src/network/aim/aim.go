@@ -8,6 +8,10 @@ import (
 	"math/rand"
 )
 
+const (
+	FoodgroupBUCP = 0x0017
+)
+
 func LogonAIM() {
 
 	// The BUCP server listens on 5190 and handles authentication, then the client is transported to the BOS server which listens on 5191
@@ -29,16 +33,14 @@ func LogonAIM() {
 				Connection: tcpServer,
 			}
 
-			flapVersion := []byte{0x00, 0x00, 0x00, 0x01}
-
-			// currently sequence are here, but they
-			// might move later
-			sequence := uint16(rand.Intn(0xFFFF))
+			context := AIMContext{
+				ServerSequence: uint16(rand.Intn(0xFFFF)),
+			}
 
 			versionFlap := &FLAPPacket{
 				Frame:    FrameSignOn,
-				Sequence: sequence,
-				Data:     flapVersion,
+				Sequence: context.ServerSequence,
+				Data:     []byte{0x00, 0x00, 0x00, 0x01},
 			}
 
 			client.Connection.BinaryWriteTraffic(FLAPDeserialize(versionFlap))
@@ -55,17 +57,14 @@ func LogonAIM() {
 				}
 
 				for _, packet := range packets {
-					switch packet.Frame {
-					case FrameSignOn:
-						if bytes.Equal(packet.Data, flapVersion) {
+					if packet.Frame == FrameSignOn {
+						if bytes.Equal(packet.Data, []byte{0x00, 0x00, 0x00, 0x01}) {
 							continue
 						}
 						// this is old FLAP authentication, TODO: implement this
+					} //else if packet.Frame == FrameData {
 
-					case FrameData:
-						// this is snac data
-
-					}
+					//}
 				}
 			}
 
