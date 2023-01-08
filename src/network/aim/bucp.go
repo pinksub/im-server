@@ -14,6 +14,7 @@ const (
 )
 
 func BUCPIncomingSNACData(client network.Client, context AIMContext, message *SNACMessage) {
+	logging.Info("AIM/BUCP", "incoming")
 	switch message.Subgroup {
 	case SubgroupChallengeRequest:
 		logging.Info("AIM/BUCP", "challenge request")

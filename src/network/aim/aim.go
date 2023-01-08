@@ -11,13 +11,6 @@ const (
 	FoodgroupBUCP = 0x0017
 )
 
-func IncomingSNACData(client network.Client, context AIMContext, message *SNACMessage) {
-	switch message.Foodgroup {
-	case FoodgroupBUCP:
-		BUCPIncomingSNACData(client, context, message)
-	}
-}
-
 func LogonAIM() {
 
 	// The BUCP server listens on 5190 and handles authentication, then the client is transported to the BOS server which listens on 5191
@@ -63,9 +56,12 @@ func LogonAIM() {
 				}
 
 				for _, packet := range packets {
-					switch packet.Frame {
-					case FrameData:
-						continue
+					if packet.Frame == FrameData {
+						snac := SNACSerialize(packet.Data)
+
+						if snac.Foodgroup == FoodgroupBUCP {
+							BUCPIncomingSNACData(client, context, snac)
+						}
 					}
 				}
 			}
