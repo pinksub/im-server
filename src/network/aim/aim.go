@@ -1,7 +1,6 @@
 package aim
 
 import (
-	"bytes"
 	"chimera/network"
 	"chimera/utility/logging"
 	"chimera/utility/tcp"
@@ -11,6 +10,10 @@ import (
 const (
 	FoodgroupBUCP = 0x0017
 )
+
+func IncomingSNACData(client network.Client, context AIMContext, message *SNACMessage) {
+	
+}
 
 func LogonAIM() {
 
@@ -57,14 +60,10 @@ func LogonAIM() {
 				}
 
 				for _, packet := range packets {
-					if packet.Frame == FrameSignOn {
-						if bytes.Equal(packet.Data, []byte{0x00, 0x00, 0x00, 0x01}) {
-							continue
-						}
-						// this is old FLAP authentication, TODO: implement this
-					} //else if packet.Frame == FrameData {
-
-					//}
+					switch packet.Frame {
+					case FrameData: 
+						continue
+					}
 				}
 			}
 
