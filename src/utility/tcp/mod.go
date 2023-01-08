@@ -51,7 +51,7 @@ func (tcp *TcpConnection) WriteTraffic(data string) error {
 
 func (tcp *TcpConnection) BinaryWriteTraffic(data []byte) error {
 	logging.Trace("TCP/WriteTraffic", "Writing Data: %s", utility.ByteSliceToHex(data)) //untested
-	_, err := tcp.client.Write([]byte(data))
+	_, err := tcp.client.Write(data)
 	return err
 }
 

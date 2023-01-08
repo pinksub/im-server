@@ -47,11 +47,7 @@ func LogonAIM() {
 			context := &AIMContext{}
 			ResetSequence(context)
 
-			versionFlap := &FLAPPacket{
-				Frame:    FrameSignOn,
-				Sequence: context.ServerSequence,
-				Data:     []byte{0x00, 0x00, 0x00, 0x01},
-			}
+			versionFlap := NewFLAP(FrameSignOn, context.ServerSequence, []byte{0x00, 0x00, 0x00, 0x01})
 
 			client.Connection.BinaryWriteTraffic(FLAPDeserialize(versionFlap))
 
