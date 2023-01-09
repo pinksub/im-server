@@ -2,7 +2,7 @@ package oscar
 
 import "math/rand"
 
-func IncrementSequence(context *OSCARContext) {
+func OSCARIncrementServerSequence(context *OSCARContext) {
 	if context.ServerSequence != 65535 {
 		context.ServerSequence++
 	} else {
@@ -10,6 +10,6 @@ func IncrementSequence(context *OSCARContext) {
 	}
 }
 
-func ResetSequence(context *OSCARContext) {
+func OSCARClearServerSequence(context *OSCARContext) {
 	context.ServerSequence = uint16(rand.Intn(0xFFFF))
 }
