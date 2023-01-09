@@ -113,6 +113,18 @@ func MySpaceHandleClientAuthentication(cli *network.Client, ctx *MySpaceContext)
 	logging.Debug("MySpace/Authentication", "RC4 Data Blob (str): %s", blob)
 	logging.Debug("MySpace/Authentication", "RC4 Data Blob (bytes): %v", []byte(blob))
 
+	meta, err := database.GetUserMetaDetailsDataByUIN(cli.ClientAccount.UIN)
+
+	if err != nil {
+		logging.Error("MySpace/Authentication", "Failed to fetch MetaDetails Data! (%s)", err.Error())
+		return false
+	}
+
+	if meta.AccountFlag > 1 {
+		logging.Warn("MySpace", "User with bad Account Flags detected (Flag: %d)! Disconnecting...", meta.AccountFlag)
+		return false
+	}
+
 	if strings.Contains(string(blob), cli.ClientAccount.Mail) && strings.Contains(string(blob), string(verifybuf)) {
 
 		if database.SetLastLoginDate(cli.ClientAccount.UIN) != nil {

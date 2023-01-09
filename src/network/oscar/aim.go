@@ -8,11 +8,11 @@ import (
 
 func LaunchOSCAR() {
 	// cheapo method of launching multiple listeners ig
-	go ListenBUCP() // Port 5190
+	go ListenAuth() // Port 5190
 	go ListenBOS()  // Port 5191
 }
 
-func ListenBUCP() {
+func ListenAuth() {
 	// The BUCP server listens on 5190 and handles authentication, then the client is transported to the BOS server which listens on 5191
 	// Right now the BUCP server is the only one which is listening
 	tcpServer := tcp.CreateListener(5190)
@@ -51,13 +51,7 @@ func ListenBUCP() {
 				}
 
 				for _, packet := range packets {
-					if packet.Frame == FrameData {
-						snac := OSCARSerializeSNAC(packet.Data)
-
-						if snac.Foodgroup == FoodgroupBUCP {
-							OSCARHandleBUCPIncomingSNACData(client, context, snac)
-						}
-					}
+					OSCARHandleAuthenticationFrameDataFromFLAP(client, context, packet)
 				}
 			}
 

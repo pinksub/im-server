@@ -40,6 +40,24 @@ func SetLastLoginDate(uin int) error {
 	return err
 }
 
+func GetUserMetaDetailsDataByUIN(uin int) (network.Meta, error) {
+
+	var meta network.Meta
+
+	row, err := Query("SELECT * from meta WHERE UIN= ?", uin)
+
+	if err != nil {
+		logging.Error("Database/GetMetaDetailsData", "Failed to get userdata: %s", err.Error())
+		return meta, err
+	}
+
+	row.Next()
+	row.Scan(&meta.UIN, &meta.UsageFlag, &meta.AccountFlag)
+	row.Close()
+
+	return meta, err
+}
+
 func GetUserDetailsDataByUIN(uin int) (network.User, error) {
 
 	var user network.User
@@ -56,7 +74,6 @@ func GetUserDetailsDataByUIN(uin int) (network.User, error) {
 	row.Close()
 
 	return user, err
-
 }
 
 func GetAccountDataByEmail(email string) (network.Account, error) {

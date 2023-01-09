@@ -14,12 +14,24 @@ import (
 
 /* == Handlers == */
 
-func OSCARHandleBUCPIncomingSNACData(client *network.Client, context *OSCARContext, message *SNACMessage) {
-	switch message.Subgroup {
-	case BUCPChallengeRequest:
-		OSCARHandleClientBUCPChallengeRequest(client, context, message)
-	case BUCPLoginRequest:
-		OSCARHandleClientBUCPLoginRequest(client, context, message)
+func OSCARHandleAuthenticationFrameDataFromFLAP(client *network.Client, context *OSCARContext, flap *FLAPPacket) {
+	switch flap.Frame {
+	case FrameSignOn:
+		OSCARHandleClientFLAPSignOnFrame(client, context, flap)
+	case FrameData:
+		snac := OSCARSerializeSNAC(flap.Data)
+
+		switch snac.Foodgroup {
+		case FoodgroupBUCP:
+
+			switch snac.Subgroup {
+			case BUCPChallengeRequest:
+				OSCARHandleClientBUCPChallengeRequest(client, context, snac)
+			case BUCPLoginRequest:
+				OSCARHandleClientBUCPLoginRequest(client, context, snac)
+			}
+
+		}
 	}
 }
 
@@ -33,26 +45,114 @@ func OSCARHandleBOSFrameDataFromFLAP(client *network.Client, context *OSCARConte
 	}
 }
 
-/* == BUCP == */
+/* == FLAP == */
 
-func OSCARHandleClientBUCPChallengeRequest(client *network.Client, context *OSCARContext, message *SNACMessage) {
-	tlvs, err := OSCARDeserializeMultipleTLVs(message.Data)
+func OSCARHandleClientFLAPSignOnFrame(client *network.Client, context *OSCARContext, flap *FLAPPacket) {
+	// thanks iserverd docs and src <3
+	icqxor := []byte{
+		0xF3, 0x26, 0x81, 0xC4, 0x39, 0x86, 0xDB, 0x92,
+		0x71, 0xA3, 0xB9, 0xE6, 0x53, 0x7A, 0x95, 0x7C,
+	}
+	/*
+		0xF3 0x26 0x81 0xC4 0x39 0x86 0xDB 0x92
+		\x71\xA3\xB9\xE6\x53\x7A\x95\x7C'
+
+	*/
+
+	tlvs, err := OSCARDeserializeMultipleTLVs(flap.Data[4:])
+
 	if err != nil {
+		logging.Error("OSCAR/FLAP Authentication", "Failed to Deserialize TLVs from FLAP Data (%s)", err.Error())
 		return
 	}
 
 	screenNameTlv := OSCARFindTLV(tlvs, 0x0001)
 	if screenNameTlv == nil {
+		logging.Error("OSCAR/FLAP Authentication", "Failed to find ScreenName TLV")
 		return
 	}
 
-	context.SNTLV = string(screenNameTlv.Value)
-	logging.Debug("OSCAR/OSCARHandleClientBUCPChallengeRequest", "SN from TLV: %s", context.SNTLV)
+	roastedtlv := OSCARFindTLV(tlvs, 0x0002)
+	if roastedtlv == nil {
+		logging.Error("OSCAR/FLAP Authentication", "Failed to find Roasted Password TLV")
+		return
+	}
 
-	context.Challenge = make([]byte, 56)
-	_, err = rand.Read(context.Challenge)
+	roast := roastedtlv.Value
+	ret := make([]byte, len(roastedtlv.Value))
+	kx := 0
+	for ix := 0; ix < len(roast); ix++ {
+		if kx > 16 {
+			kx = 0
+		}
+
+		ret[ix] = roast[ix] ^ icqxor[kx]
+		kx++
+	}
+
+	logging.Debug("OSCAR/FLAP Authentication", "Roasted PW: %v", roast)
+	logging.Debug("OSCAR/FLAP Authentication", "Unroasted PW: %v", ret)
+
+	client.ClientAccount, err = database.GetAccountDataByDisplayName(string(screenNameTlv.Value))
 
 	if err != nil {
+		logging.Error("OSCAR/FLAP Authentication", "Failed to fetch Account Data! (%s)", err.Error())
+		return
+	}
+
+	logging.Debug("OSCAR/FLAP Authentication", "NetworkAccount UIN: %d", client.ClientAccount.UIN)
+	logging.Debug("OSCAR/FLAP Authentication", "NetworkAccount SN: %s", client.ClientAccount.DisplayName)
+	logging.Debug("OSCAR/FLAP Authentication", "NetworkAccount Mail: %s", client.ClientAccount.Mail)
+	logging.Debug("OSCAR/FLAP Authentication", "NetworkAccount PW: %v", []byte(client.ClientAccount.Password))
+
+	data := []byte{}
+	if bytes.Equal(ret, []byte(client.ClientAccount.Password)) {
+		context.BOSCookie = make([]byte, 256)
+		_, err = rand.Read(context.BOSCookie)
+
+		if err != nil {
+			logging.Error("OSCAR/FLAP Authentication", "Failed to generate BOS Cookie! (%s)", err.Error())
+			return
+		}
+
+		clientversion := OSCARFindTLV(tlvs, 0x0003)
+		logging.Info("OSCAR", "Client successfully authenticated! (UIN: %d, SN: %s, Version: %s, Proto: OSCAR)", client.ClientAccount.UIN, client.ClientAccount.DisplayName, clientversion.Value)
+
+		screenNameTlv := OSCARNewTLV(0x0001, []byte(client.ClientAccount.DisplayName))
+		bosAddrTlv := OSCARNewTLV(0x0005, []byte(configuration.GetConfiguration().Connection.Root+":5191"))
+		bosCookieTlv := OSCARNewTLV(0x0006, context.BOSCookie)
+
+		data = append(data, OSCARDeserializeTLV(screenNameTlv)...)
+		data = append(data, OSCARDeserializeTLV(bosAddrTlv)...)
+		data = append(data, OSCARDeserializeTLV(bosCookieTlv)...)
+	} else {
+		logging.Warn("OSCAR", "Client has failed FLAP authentication! (UIN: %d, SN: %s)", client.ClientAccount.UIN, string(screenNameTlv.Value))
+
+		screenNameTlv := OSCARNewTLV(0x0001, []byte(client.ClientAccount.DisplayName))
+		errorCodeTlv := OSCARNewTLV(0x0008, []byte{0x00, 0x04})
+		errorUrlTlv := OSCARNewTLV(0x0004, []byte(fmt.Sprintf("http://%s/", configuration.GetConfiguration().Connection.Root)))
+		unkTlv := OSCARNewTLV(0x000C, []byte{0x00, 0x00})
+
+		data = append(data, OSCARDeserializeTLV(screenNameTlv)...)
+		data = append(data, OSCARDeserializeTLV(errorCodeTlv)...)
+		data = append(data, OSCARDeserializeTLV(errorUrlTlv)...)
+		data = append(data, OSCARDeserializeTLV(unkTlv)...)
+	}
+
+	OSCARIncrementServerSequence(context)
+
+	flappack := OSCARNewFLAPPacket(FrameSignOff, context.ServerSequence, data)
+	client.Connection.BinaryWriteTraffic(OSCARDeserializeFLAP(flappack))
+}
+
+/* == BUCP == */
+
+func OSCARHandleClientBUCPChallengeRequest(client *network.Client, context *OSCARContext, message *SNACMessage) {
+	context.Challenge = make([]byte, 56)
+	_, err := rand.Read(context.Challenge)
+
+	if err != nil {
+		logging.Error("OSCAR/BUCP Authentication", "Failed to generate Challenge! (%s)", err.Error())
 		return
 	}
 
@@ -71,20 +171,29 @@ func OSCARHandleClientBUCPChallengeRequest(client *network.Client, context *OSCA
 
 func OSCARHandleClientBUCPLoginRequest(client *network.Client, context *OSCARContext, message *SNACMessage) {
 	if context.Challenge == nil {
+		logging.Error("OSCAR/BUCP Authentication", "No BUCP Challenge Provided")
 		return
 	}
 
 	tlvs, err := OSCARDeserializeMultipleTLVs(message.Data)
 	if err != nil {
+		logging.Error("OSCAR/BUCP Authentication", "Failed to Deserialize TLVs from SNAC Data")
 		return
 	}
 
 	passwordTlv := OSCARFindTLV(tlvs, 0x0025)
 	if passwordTlv == nil {
+		logging.Error("OSCAR/BUCP Authentication", "Failed to find Password TLV")
 		return
 	}
 
-	client.ClientAccount, err = database.GetAccountDataByDisplayName(context.SNTLV)
+	screenNameTlv := OSCARFindTLV(tlvs, 0x0001)
+	if screenNameTlv == nil {
+		logging.Error("OSCAR/BUCP Authentication", "Failed to find ScreenName TLV")
+		return
+	}
+
+	client.ClientAccount, err = database.GetAccountDataByDisplayName(string(screenNameTlv.Value))
 
 	if err != nil {
 		logging.Error("OSCAR/BUCP Authentication", "Failed to fetch Account Data! (%s)", err.Error())
@@ -146,12 +255,16 @@ func OSCARHandleClientBUCPLoginRequest(client *network.Client, context *OSCARCon
 		_, err = rand.Read(context.BOSCookie)
 
 		if err != nil {
+			logging.Error("OSCAR/BUCP Authentication", "Failed to generate BOS Cookie! (%s)", err.Error())
 			return
 		}
 
+		clientversion := OSCARFindTLV(tlvs, 0x0003)
+
 		//	logging.Info("MySpace", "Client successfully authenticated! (UIN: %d, SN: %s, Mail: %s, Build: %s, Proto: %s)", cli.ClientAccount.UIN, cli.ClientAccount.DisplayName, cli.ClientAccount.Mail, cli.ClientInfo.Build, cli.ClientInfo.Protocol)
 		// i've left out Build from the message since idk how or even if BUCP even knows what version is being used - Lu
-		logging.Info("OSCAR", "Client successfully authenticated! (UIN: %d, SN: %s, Proto: OSCAR)", client.ClientAccount.UIN, client.ClientAccount.DisplayName)
+		// nvm that last comment, figured out that 0x0003 contains the clients version string, we now also print the clientversion on successful login - Lu
+		logging.Info("OSCAR", "Client successfully authenticated! (UIN: %d, SN: %s, Version: %s, Proto: OSCAR)", client.ClientAccount.UIN, client.ClientAccount.DisplayName, clientversion.Value)
 
 		screenNameTlv := OSCARNewTLV(0x0001, []byte(client.ClientAccount.DisplayName))
 		bosAddrTlv := OSCARNewTLV(0x0005, []byte(conn.Root+":5191"))
@@ -169,11 +282,11 @@ func OSCARHandleClientBUCPLoginRequest(client *network.Client, context *OSCARCon
 
 	} else {
 		// i fall back on SNTLV here since client.ClientAccount.DisplayName could be empty if the fetch failed (i.e wrong username)
-		logging.Warn("OSCAR", "Client has failed BUCP authentication! (UIN: %d, SN: %s)", client.ClientAccount.UIN, context.SNTLV)
+		logging.Warn("OSCAR", "Client has failed BUCP authentication! (UIN: %d, SN: %s)", client.ClientAccount.UIN, string(screenNameTlv.Value))
 
 		screenNameTlv := OSCARNewTLV(0x0001, []byte(client.ClientAccount.DisplayName))
-		errorCodeTlv := OSCARNewTLV(0x0008, []byte{0x00, 0x05})
-		errorUrlTlv := OSCARNewTLV(0x0004, []byte(fmt.Sprintf("http://%s/passport/forgot.php", conn.Root)))
+		errorCodeTlv := OSCARNewTLV(0x0008, []byte{0x00, 0x04})
+		errorUrlTlv := OSCARNewTLV(0x0004, []byte(fmt.Sprintf("http://%s/", conn.Root)))
 		pwdChangeUrlTlv := OSCARNewTLV(0x0054, []byte(fmt.Sprintf("http://%s/passport/forgot.php", conn.Root)))
 
 		data = append(data, OSCARDeserializeTLV(screenNameTlv)...)
