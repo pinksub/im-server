@@ -75,3 +75,21 @@ func GetAccountDataByDisplayName(displayName string) (network.Account, error) {
 
 	return acc, err
 }
+
+func GetAccountDataByUIN(uin int) (network.Account, error) {
+
+	var acc network.Account
+
+	row, err := Query("SELECT * from accounts WHERE UIN= ?", uin)
+
+	if err != nil {
+		logging.Error("Database/GetUserData", "Failed to get userdata: %s", err.Error())
+		return acc, err
+	}
+
+	row.Next()
+	row.Scan(&acc.UIN, &acc.DisplayName, &acc.Mail, &acc.Password)
+	row.Close()
+
+	return acc, err
+}
