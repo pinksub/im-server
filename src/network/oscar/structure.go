@@ -31,7 +31,11 @@ type TLV struct {
 
 // Foodgroups
 const (
-	FoodgroupBUCP = 0x0017
+	FoodgroupOSERVICE = 0x0001
+	FoodgroupBUDDY    = 0x0003
+	FoodgroupICBM     = 0x0004
+	FoodgroupFEEDBAG  = 0x0013
+	FoodgroupBUCP     = 0x0017
 )
 
 // FLAP
@@ -44,10 +48,22 @@ const (
 
 // BUCP
 const (
-	SubgroupLoginRequest      = 0x0002
-	SubgroupLoginResponse     = 0x0003
-	SubgroupChallengeRequest  = 0x0006
-	SubgroupChallengeResponse = 0x0007
+	BUCPLoginRequest      = 0x0002
+	BUCPLoginResponse     = 0x0003
+	BUCPChallengeRequest  = 0x0006
+	BUCPChallengeResponse = 0x0007
 )
+
+// OSERVICE
+const (
+	OSERVICEHostOnline = 0x0003
+)
+
+var supportedFoodgroups []uint16 = []uint16{
+	FoodgroupOSERVICE,
+	FoodgroupBUDDY,
+	FoodgroupICBM,
+	FoodgroupFEEDBAG,
+}
 
 var clientContexts []*OSCARContext

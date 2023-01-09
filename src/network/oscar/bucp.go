@@ -13,7 +13,7 @@ import (
 
 func BUCPIncomingSNACData(client *network.Client, context *OSCARContext, message *SNACMessage) {
 	switch message.Subgroup {
-	case SubgroupChallengeRequest:
+	case BUCPChallengeRequest:
 		tlvs, err := TLVsDeserialize(message.Data)
 		if err != nil {
 			return
@@ -40,12 +40,12 @@ func BUCPIncomingSNACData(client *network.Client, context *OSCARContext, message
 
 		IncrementSequence(context)
 
-		challengeSnac := NewSNAC(message.Foodgroup, SubgroupChallengeResponse, 0, 0, data)
+		challengeSnac := NewSNAC(message.Foodgroup, BUCPChallengeResponse, 0, 0, data)
 		challengeFlap := NewFLAP(FrameData, context.ServerSequence, SNACDeserialize(challengeSnac))
 
 		client.Connection.BinaryWriteTraffic(FLAPDeserialize(challengeFlap))
 
-	case SubgroupLoginRequest:
+	case BUCPLoginRequest:
 		if context.Challenge == nil {
 			return
 		}
@@ -138,7 +138,7 @@ func BUCPIncomingSNACData(client *network.Client, context *OSCARContext, message
 
 		IncrementSequence(context)
 
-		snac := NewSNAC(message.Foodgroup, SubgroupLoginResponse, 0, 0, data)
+		snac := NewSNAC(message.Foodgroup, BUCPLoginResponse, 0, 0, data)
 		flap := NewFLAP(FrameData, context.ServerSequence, SNACDeserialize(snac))
 		client.Connection.BinaryWriteTraffic(FLAPDeserialize(flap))
 	}
