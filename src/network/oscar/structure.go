@@ -5,7 +5,6 @@ type OSCARContext struct {
 	ClientSequence uint16
 	Challenge      []byte
 	BOSCookie      []byte
-	UIN            int
 }
 
 type FLAPPacket struct {
